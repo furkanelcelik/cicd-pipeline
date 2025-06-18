@@ -1,14 +1,12 @@
 pipeline {
     agent any
 
-    environment {
-        DOCKER_IMAGE = "${env.BRANCH_NAME == 'main' ? 'nodemain:v1.0' : 'nodedev:v1.0'}"
-        CONTAINER_PORT = "${env.BRANCH_NAME == 'main' ? '3000' : '3001'}"
-        HOST_PORT = "${env.BRANCH_NAME == 'main' ? '3000' : '3001'}"
+    tools {
+        nodejs 'node'
     }
 
-    tools {
-        nodejs "node" // Name you used in Global Tool Configuration
+    environment {
+        APP_NAME = "my-node-app"
     }
 
     stages {
@@ -18,37 +16,55 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Set Environment & Logo') {
             steps {
-                sh 'npm install'
+                script {
+                    if (env.BRANCH_NAME == 'main') {
+                        echo "BRANCH: main. Setting port to 3000."
+                        env.PORT = '3000'
+                        sh 'cp app/src/logo-main.svg app/src/logo.svg'
+                    } else if (env.BRANCH_NAME == 'dev') {
+                        echo "BRANCH: dev. Setting port to 3001."
+                        env.PORT = '3001'
+                        sh 'cp app/src/logo-dev.svg app/src/logo.svg'
+                    }
+                    env.DOCKER_TAG = "${env.APP_NAME}-${env.BRANCH_NAME}:v1.0"
+                }
             }
         }
 
-        stage('Run Tests') {
+        stage('Build Application') {
             steps {
-                sh 'npm test'
+                dir('app') {
+                   sh 'npm install'
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                dir('app') {
+                    sh 'npm test'
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t $DOCKER_IMAGE ."
+                sh "docker build -t ${env.DOCKER_TAG} ."
             }
         }
 
-        stage('Stop and Remove Previous Containers') {
+        stage('Deploy') {
             steps {
-                sh """
-                    docker ps -q --filter "ancestor=$DOCKER_IMAGE" | xargs -r docker stop
-                    docker ps -a -q --filter "ancestor=$DOCKER_IMAGE" | xargs -r docker rm
-                """
-            }
-        }
-
-        stage('Run Docker Container') {
-            steps {
-                sh "docker run -d -p ${HOST_PORT}:3000 $DOCKER_IMAGE"
+                script {
+                    def containerName = "${env.APP_NAME}-${env.BRANCH_NAME}"
+                    sh "docker stop ${containerName} || true"
+                    sh "docker rm ${containerName} || true"
+                    sh "docker run -d --name ${containerName} -p ${env.PORT}:3000 ${env.DOCKER_TAG}"
+                }
             }
         }
     }
 }
+a
