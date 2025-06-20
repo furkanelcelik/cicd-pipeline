@@ -22,11 +22,11 @@ pipeline {
                     if (env.BRANCH_NAME == 'main') {
                         echo "BRANCH: main. Setting port to 3000."
                         env.PORT = '3000'
-                        sh 'cp app/src/logo-main.svg app/src/logo.svg'
+                        sh 'cp src/logo-main.svg src/logo.svg'
                     } else if (env.BRANCH_NAME == 'dev') {
                         echo "BRANCH: dev. Setting port to 3001."
                         env.PORT = '3001'
-                        sh 'cp app/src/logo-dev.svg app/src/logo.svg'
+                        sh 'cp src/logo-dev.svg src/logo.svg'
                     }
                     env.DOCKER_TAG = "${env.APP_NAME}-${env.BRANCH_NAME}:v1.0"
                 }
